@@ -21,6 +21,8 @@ services:
         sync: false
       - key: CLIENT_CUSTOMER_URL
         sync: false
+      - key: CLIENT_VERCEL_PROJECTS
+        sync: false
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
