@@ -1,0 +1,4 @@
+acesskey_id="be351f501969d37d9be0129d05eb67e3"
+accesskey="bdca149e76cc227f433d2990b0c7da5e2c589050b32fb124e5ccf4f09f0c73ca"
+supabasestorage=https://vgjmqwptujentasvjmnp.storage.supabase.co/storage/v1/s3
+region="ap-northeast-2"
