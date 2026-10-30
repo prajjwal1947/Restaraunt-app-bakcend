@@ -6,6 +6,7 @@ import swaggerUi from "swagger-ui-express";
 import { requestId, errorHandler, notFound } from "./lib/http";
 import { openapi } from "./openapi";
 import { authRouter } from "./routes/auth";
+import { analyticsAssistantRouter } from "./routes/analyticsAssistant";
 import { adminRouter } from "./routes/admin";
 import { publicRouter } from "./routes/public";
 import { prisma } from "./lib/prisma";
@@ -29,6 +30,7 @@ const isAllowedOrigin = (origin: string) => {
 
 	try {
 		const { hostname, protocol } = new URL(origin);
+		if (process.env.NODE_ENV !== "production" && (hostname === "localhost" || hostname === "127.0.0.1")) return true;
 		return protocol === "https:" && allowedVercelProjects.some((project) =>
 			hostname === `${project}.vercel.app`
 			|| (hostname.startsWith(`${project}-`) && hostname.endsWith(".vercel.app")),
@@ -67,6 +69,9 @@ app.get("/health/db", async (_request, response) => {
 
 app.use("/api/v1/public", publicRouter);
 app.use("/api/v1/auth", authRouter);
+app.use("/api/v1/dashboard/insights", analyticsAssistantRouter);
 app.use("/api/v1", adminRouter);
 app.use("/api/v1", notFound);
 app.use(errorHandler);
+
+export default app;

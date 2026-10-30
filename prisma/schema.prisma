@@ -38,6 +38,9 @@ model Restaurant {
   logoUrl      String?
   currency     String           @default("INR")
   timezone     String           @default("Asia/Kolkata")
+  latitude     Float?
+  longitude    Float?
+  contextRadiusKm Int           @default(3)
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
   users        User[]
@@ -47,6 +50,9 @@ model Restaurant {
   tables       RestaurantTable[]
   orders       Order[]
   refreshTokens RefreshToken[]
+  analyticsChatMessages AnalyticsChatMessage[]
+  localActivities LocalActivity[]
+  contextCaches RestaurantContextCache[]
 }
 
 model User {
@@ -64,6 +70,7 @@ model User {
   restaurant   Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   refreshTokens RefreshToken[]
   statusEvents OrderStatusEvent[]
+  analyticsChatMessages AnalyticsChatMessage[]
   @@unique([restaurantId, email])
   @@index([email])
 }
@@ -233,4 +240,47 @@ model OrderStatusEvent {
   order        Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
   actor        User?       @relation(fields: [actorId], references: [id], onDelete: SetNull)
   @@index([orderId, createdAt])
+}
+
+model AnalyticsChatMessage {
+  id           String     @id @default(uuid()) @db.Uuid
+  restaurantId String     @db.Uuid
+  userId       String     @db.Uuid
+  role         String
+  content      String     @db.Text
+  createdAt    DateTime   @default(now())
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, userId, createdAt])
+}
+
+model LocalActivity {
+  id           String     @id @default(uuid()) @db.Uuid
+  restaurantId String     @db.Uuid
+  kind         String
+  scope        String
+  title        String
+  placeName    String
+  startsOn     DateTime   @db.Date
+  endsOn       DateTime   @db.Date
+  latitude     Float?
+  longitude    Float?
+  sourceUrl    String?
+  createdAt    DateTime   @default(now())
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, startsOn, endsOn])
+}
+
+model RestaurantContextCache {
+  restaurantId String     @db.Uuid
+  provider     String
+  cacheKey     String
+  payload      Json
+  fetchedAt    DateTime   @default(now())
+  expiresAt    DateTime
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@id([restaurantId, provider])
 }

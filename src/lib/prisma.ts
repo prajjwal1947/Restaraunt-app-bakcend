@@ -8,9 +8,10 @@ if (!configuredConnectionString) {
 
 const connectionString = configuredConnectionString
 	.replace(/[?&]sslmode=[^&]+/, "");
+const isLocalDb = /@(localhost|127\.0\.0\.1)[:/]/.test(connectionString);
 const adapter = new PrismaPg({
 	connectionString,
-	ssl: { rejectUnauthorized: false },
+	ssl: isLocalDb ? false : { rejectUnauthorized: false },
 	connectionTimeoutMillis: Number(process.env.DB_CONNECTION_TIMEOUT_MS ?? 10000),
 	max: Number(process.env.DB_POOL_MAX ?? 5),
 	idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT_MS ?? 30000),

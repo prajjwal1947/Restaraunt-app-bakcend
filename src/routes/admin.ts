@@ -15,6 +15,7 @@ import {
 } from "../lib/http";
 import { authenticate, requireRole } from "../lib/auth";
 import { uploadToSupabase } from "../lib/storage";
+import { locationSchema } from "../lib/localContext";
 
 export const adminRouter = Router();
 const upload = multer({
@@ -58,9 +59,29 @@ adminRouter.patch(
   requireRole("OWNER", "MANAGER"),
   asyncRoute(async (request, response) => {
     const body = requireBody(request.body);
+    let locationData = {};
+    if (["latitude", "longitude", "contextRadiusKm"].some((field) => body[field] !== undefined)) {
+      const existing = await prisma.restaurant.findUnique({
+        where: { id: tenant(request) }, select: { latitude: true, longitude: true, contextRadiusKm: true },
+      });
+      if (!existing) throw new HttpError(404, "NOT_FOUND", "Restaurant not found.");
+      const result = locationSchema.safeParse({
+        ...existing,
+        ...(body.latitude !== undefined ? { latitude: body.latitude } : {}),
+        ...(body.longitude !== undefined ? { longitude: body.longitude } : {}),
+        ...(body.contextRadiusKm !== undefined ? { contextRadiusKm: body.contextRadiusKm } : {}),
+      });
+      if (!result.success) throw new HttpError(422, "VALIDATION_ERROR", result.error.issues[0].message);
+      locationData = result.data;
+    }
+    if (body.timezone !== undefined) {
+      try { new Intl.DateTimeFormat("en", { timeZone: stringValue(body.timezone, "timezone")! }); }
+      catch { throw new HttpError(422, "INVALID_TIMEZONE", "Enter a valid IANA timezone."); }
+    }
     const restaurant = await prisma.restaurant.update({
       where: { id: tenant(request) },
       data: {
+        ...locationData,
         ...(body.name !== undefined
           ? { name: stringValue(body.name, "name") }
           : {}),
