@@ -15,6 +15,7 @@ import {
 } from "../lib/http";
 import { authenticate, requireRole } from "../lib/auth";
 import { uploadToSupabase } from "../lib/storage";
+import { tableCustomerUrl } from "../lib/customerAppUrl";
 import { locationSchema } from "../lib/localContext";
 
 export const adminRouter = Router();
@@ -631,6 +632,7 @@ adminRouter.get(
         ...table,
         currentOrderNumber: table.orders[0]?.orderNumber,
         currentOrderTotal: table.orders[0]?.totalMinor,
+        qrUrl: tableCustomerUrl(table.qrToken, process.env.CLIENT_CUSTOMER_URL),
         orders: undefined,
       })),
     });
@@ -646,7 +648,7 @@ adminRouter.get(
     response.json({
       data: {
         ...table,
-        qrUrl: `${process.env.CLIENT_CUSTOMER_URL ?? "http://localhost:5174"}/t/${table.qrToken}`,
+        qrUrl: tableCustomerUrl(table.qrToken, process.env.CLIENT_CUSTOMER_URL),
       },
     });
   }),
@@ -669,7 +671,7 @@ adminRouter.post(
       .json({
         data: {
           ...table,
-          qrUrl: `${process.env.CLIENT_CUSTOMER_URL ?? "http://localhost:5174"}/t/${table.qrToken}`,
+          qrUrl: tableCustomerUrl(table.qrToken, process.env.CLIENT_CUSTOMER_URL),
         },
       });
   }),
@@ -733,7 +735,7 @@ adminRouter.post(
     response.json({
       data: {
         ...table,
-        qrUrl: `${process.env.CLIENT_CUSTOMER_URL ?? "http://localhost:5174"}/t/${table!.qrToken}`,
+        qrUrl: tableCustomerUrl(table!.qrToken, process.env.CLIENT_CUSTOMER_URL),
       },
     });
   }),
@@ -745,7 +747,7 @@ adminRouter.get(
       where: { id: id(request, "tableId"), restaurantId: tenant(request) },
     });
     if (!table) throw new HttpError(404, "NOT_FOUND", "Table not found.");
-    const url = `${process.env.CLIENT_CUSTOMER_URL ?? "http://localhost:5174"}/t/${table.qrToken}`;
+    const url = tableCustomerUrl(table.qrToken, process.env.CLIENT_CUSTOMER_URL);
     response.type("text/plain").send(await QRCode.toDataURL(url));
   }),
 );
