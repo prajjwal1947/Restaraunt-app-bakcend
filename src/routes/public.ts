@@ -16,11 +16,17 @@ const orderLimit = rateLimit({
   standardHeaders: "draft-7",
   legacyHeaders: false,
 });
+const serviceRequestLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+});
 
 const tableForToken = async (token: string) => {
   const table = await prisma.restaurantTable.findFirst({
     where: { qrToken: token, isActive: true },
-    include: { restaurant: true },
+    include: { restaurant: { include: { branding: true } } },
   });
   if (!table) throw new HttpError(404, "NOT_FOUND", "Table context not found.");
   return table;
@@ -80,6 +86,12 @@ publicRouter.get(
           name: table.restaurant.name,
           tagline: table.restaurant.tagline,
           currency: table.restaurant.currency,
+          branding: {
+            brandName: table.restaurant.branding?.brandName ?? null,
+            logoUrl: table.restaurant.branding?.logoUrl ?? table.restaurant.logoUrl,
+            gradientStart: table.restaurant.branding?.gradientStart ?? "#e86a33",
+            gradientEnd: table.restaurant.branding?.gradientEnd ?? "#f7c59f",
+          },
         },
         table: { id: table.id, number: table.number, capacity: table.capacity },
       },
@@ -212,6 +224,36 @@ publicRouter.get(
       },
     });
     response.json({ data: orders.map(publicOrder) });
+  }),
+);
+
+publicRouter.post(
+  "/tables/:tableToken/service-requests",
+  serviceRequestLimit,
+  asyncRoute(async (request, response) => {
+    const table = await tableForToken(
+      stringValue(request.params.tableToken, "tableToken")!,
+    );
+    const body = requireBody(request.body);
+    const type = stringValue(body.type, "type")!;
+    if (type !== "WAITER" && type !== "BILL")
+      throw new HttpError(422, "VALIDATION_ERROR", "One or more fields are invalid.", {
+        type: "Choose WAITER or BILL.",
+      });
+    // Repeated taps keep a single open request per table and type.
+    const existing = await prisma.serviceRequest.findFirst({
+      where: { tableId: table.id, type, resolvedAt: null },
+    });
+    const serviceRequest = existing ?? await prisma.serviceRequest.create({
+      data: { restaurantId: table.restaurantId, tableId: table.id, type },
+    });
+    response.status(existing ? 200 : 201).json({
+      data: {
+        id: serviceRequest.id,
+        type: serviceRequest.type,
+        createdAt: serviceRequest.createdAt,
+      },
+    });
   }),
 );
 

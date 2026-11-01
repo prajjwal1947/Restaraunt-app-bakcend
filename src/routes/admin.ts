@@ -48,10 +48,58 @@ adminRouter.get(
   asyncRoute(async (request, response) => {
     const restaurant = await prisma.restaurant.findUnique({
       where: { id: tenant(request) },
+      include: { branding: true },
     });
     if (!restaurant)
       throw new HttpError(404, "NOT_FOUND", "Restaurant not found.");
-    response.json({ data: restaurant });
+    response.json({ data: {
+      ...restaurant,
+      branding: restaurant.branding ?? {
+        brandName: null,
+        logoUrl: restaurant.logoUrl,
+        gradientStart: "#e86a33",
+        gradientEnd: "#f7c59f",
+      },
+    } });
+  }),
+);
+
+adminRouter.patch(
+  "/restaurant/branding",
+  requireRole("OWNER", "MANAGER"),
+  asyncRoute(async (request, response) => {
+    const body = requireBody(request.body);
+    const color = (value: unknown, field: string) => {
+      const parsed = stringValue(value, field)!;
+      if (!/^#[\da-fA-F]{6}$/.test(parsed)) {
+        throw new HttpError(422, "VALIDATION_ERROR", `${field} must be a 6-digit hex color.`);
+      }
+      return parsed.toLowerCase();
+    };
+    if (body.brandName === undefined && body.gradientStart === undefined && body.gradientEnd === undefined) {
+      throw new HttpError(422, "VALIDATION_ERROR", "Choose a brand name or at least one brand color.");
+    }
+    let brandName: string | null | undefined;
+    if (body.brandName === null) brandName = null;
+    else if (body.brandName !== undefined) {
+      brandName = stringValue(body.brandName, "brandName")!;
+      if (brandName.length > 60) throw new HttpError(422, "VALIDATION_ERROR", "Brand name must be 60 characters or fewer.");
+    }
+    const branding = await prisma.restaurantBranding.upsert({
+      where: { restaurantId: tenant(request) },
+      create: {
+        restaurantId: tenant(request),
+        brandName: brandName ?? null,
+        gradientStart: body.gradientStart === undefined ? "#e86a33" : color(body.gradientStart, "gradientStart"),
+        gradientEnd: body.gradientEnd === undefined ? "#f7c59f" : color(body.gradientEnd, "gradientEnd"),
+      },
+      update: {
+        ...(brandName !== undefined ? { brandName } : {}),
+        ...(body.gradientStart !== undefined ? { gradientStart: color(body.gradientStart, "gradientStart") } : {}),
+        ...(body.gradientEnd !== undefined ? { gradientEnd: color(body.gradientEnd, "gradientEnd") } : {}),
+      },
+    });
+    response.json({ data: branding });
   }),
 );
 
@@ -128,9 +176,22 @@ const imageUpload = (field: "logoUrl" | "imageUrl", folder: string) =>
     );
     const data = field === "logoUrl" ? { logoUrl: url } : undefined;
     if (data) {
-      const restaurant = await prisma.restaurant.update({
-        where: { id: tenant(request) },
-        data,
+      const restaurant = await prisma.$transaction(async (transaction) => {
+        const updated = await transaction.restaurant.update({
+          where: { id: tenant(request) },
+          data,
+        });
+        const branding = await transaction.restaurantBranding.upsert({
+          where: { restaurantId: tenant(request) },
+          create: {
+            restaurantId: tenant(request),
+            logoUrl: url,
+            gradientStart: "#e86a33",
+            gradientEnd: "#f7c59f",
+          },
+          update: { logoUrl: url },
+        });
+        return { ...updated, branding };
       });
       response.json({ data: restaurant });
       return;
@@ -784,6 +845,42 @@ adminRouter.get(
       prisma.order.count({ where }),
     ]);
     response.json(collection(orders.map(orderView), page, pageSize, total));
+  }),
+);
+adminRouter.get(
+  "/service-requests",
+  asyncRoute(async (request, response) => {
+    const requests = await prisma.serviceRequest.findMany({
+      where: { restaurantId: tenant(request), resolvedAt: null },
+      include: { table: true },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    });
+    response.json({
+      data: requests.map((item) => ({
+        id: item.id,
+        type: item.type,
+        tableNumber: item.table.number,
+        createdAt: item.createdAt,
+      })),
+    });
+  }),
+);
+adminRouter.patch(
+  "/service-requests/:requestId/resolve",
+  requireRole("OWNER", "MANAGER", "STAFF"),
+  asyncRoute(async (request, response) => {
+    const result = await prisma.serviceRequest.updateMany({
+      where: {
+        id: id(request, "requestId"),
+        restaurantId: tenant(request),
+        resolvedAt: null,
+      },
+      data: { resolvedAt: new Date(), resolvedById: request.auth!.userId },
+    });
+    if (result.count === 0)
+      throw new HttpError(404, "NOT_FOUND", "Open service request not found.");
+    response.status(204).end();
   }),
 );
 adminRouter.get(

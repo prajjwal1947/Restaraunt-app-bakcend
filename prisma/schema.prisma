@@ -27,6 +27,11 @@ enum OrderStatus {
   CANCELLED
 }
 
+enum ServiceRequestType {
+  WAITER
+  BILL
+}
+
 model Restaurant {
   id           String           @id @default(uuid()) @db.Uuid
   name         String
@@ -44,15 +49,28 @@ model Restaurant {
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
   users        User[]
+  branding     RestaurantBranding?
   categories   MenuCategory[]
   items        MenuItem[]
   addOns       AddOn[]
   tables       RestaurantTable[]
   orders       Order[]
+  serviceRequests ServiceRequest[]
   refreshTokens RefreshToken[]
   analyticsChatMessages AnalyticsChatMessage[]
   localActivities LocalActivity[]
   contextCaches RestaurantContextCache[]
+}
+
+model RestaurantBranding {
+  restaurantId  String     @id @db.Uuid
+  brandName     String?    @db.VarChar(60)
+  logoUrl       String?
+  gradientStart String     @default("#e86a33") @db.VarChar(7)
+  gradientEnd   String     @default("#f7c59f") @db.VarChar(7)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 }
 
 model User {
@@ -70,6 +88,7 @@ model User {
   restaurant   Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   refreshTokens RefreshToken[]
   statusEvents OrderStatusEvent[]
+  serviceRequests ServiceRequest[]
   analyticsChatMessages AnalyticsChatMessage[]
   @@unique([restaurantId, email])
   @@index([email])
@@ -169,8 +188,24 @@ model RestaurantTable {
   updatedAt    DateTime    @updatedAt
   restaurant   Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   orders       Order[]
+  serviceRequests ServiceRequest[]
   @@unique([restaurantId, number])
   @@index([restaurantId, status])
+}
+
+model ServiceRequest {
+  id           String             @id @default(uuid()) @db.Uuid
+  restaurantId String             @db.Uuid
+  tableId      String             @db.Uuid
+  type         ServiceRequestType
+  resolvedAt   DateTime?
+  resolvedById String?            @db.Uuid
+  createdAt    DateTime           @default(now())
+  restaurant   Restaurant         @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  table        RestaurantTable    @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  resolvedBy   User?              @relation(fields: [resolvedById], references: [id], onDelete: SetNull)
+  @@index([restaurantId, resolvedAt, createdAt])
+  @@index([tableId, type, resolvedAt])
 }
 
 model Order {

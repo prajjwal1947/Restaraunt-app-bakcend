@@ -39,11 +39,13 @@ async function seedDemo() {
   const connection = new URL(process.env.DATABASE_URL!);
   const isLocalDatabase = ["localhost", "127.0.0.1", "[::1]"].includes(connection.hostname);
   assert(isLocalDatabase || process.env.ALLOW_REMOTE_DEMO_SEED === "true", "Set ALLOW_REMOTE_DEMO_SEED=true to seed the dedicated demo tenant remotely.");
+  const ownerEmail = process.env.SEED_OWNER_EMAIL ?? "admin@olive-thyme-demo.example";
   const owner = await prisma.user.findFirst({
-    where: { email: "admin@olive-thyme-demo.example", role: "OWNER", isActive: true },
+    where: { email: ownerEmail, role: "OWNER", isActive: true },
     include: { restaurant: true },
   });
-  assert(owner?.restaurant.email === "hello@olive-thyme-demo.example", "The expected demo owner and restaurant must already exist.");
+  assert(owner, "The expected owner and restaurant must already exist.");
+  assert(process.env.SEED_OWNER_EMAIL || owner.restaurant.email === "hello@olive-thyme-demo.example", "The expected demo owner and restaurant must already exist.");
   const restaurantId = owner.restaurantId;
   const now = new Date();
   const historyStart = new Date(now);
@@ -166,7 +168,7 @@ async function seedDemo() {
     for (let day = new Date(historyStart), dayIndex = 0; day <= now; day.setDate(day.getDate() + 1), dayIndex += 1) {
       const ageDays = (now.getTime() - day.getTime()) / 86400000;
       const today = day.toDateString() === now.toDateString();
-      const count = ageDays < 30 || dayIndex % 10 === 0 ? 1 : 0;
+      const count = ageDays < 30 ? 2 : dayIndex % 5 === 0 ? 1 : 0;
       for (let index = 0; index < count; index += 1) {
         const createdAt = new Date(day);
         if (today) {
@@ -211,6 +213,6 @@ async function seedDemo() {
 }
 
 seedDemo().catch((error) => {
-  console.error(error instanceof Error ? error.message : "Demo seeding failed.");
+  console.error(error instanceof Error ? (process.env.SEED_DEBUG ? error.stack : error.message) : "Demo seeding failed.");
   process.exitCode = 1;
 }).finally(() => prisma.$disconnect());
