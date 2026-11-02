@@ -221,6 +221,8 @@ model Order {
   rating          Int?               @db.SmallInt
   customerNote    String?
   idempotencyKey  String?
+  customerSessionId String?
+  billedAt        DateTime?
   placedAt        DateTime           @default(now())
   confirmedAt     DateTime?
   servedAt        DateTime?
@@ -235,6 +237,8 @@ model Order {
   @@unique([restaurantId, idempotencyKey])
   @@index([restaurantId, status, createdAt])
   @@index([tableId, createdAt])
+  @@index([tableId, billedAt])
+  @@index([tableId, customerSessionId, createdAt])
 }
 
 model OrderItem {

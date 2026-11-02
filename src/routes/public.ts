@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request } from "express";
 import rateLimit from "express-rate-limit";
 import { prisma } from "../lib/prisma";
 import {
@@ -22,6 +22,11 @@ const serviceRequestLimit = rateLimit({
   standardHeaders: "draft-7",
   legacyHeaders: false,
 });
+
+const sessionIdFrom = (request: Request) => {
+  const value = request.header("x-customer-session");
+  return value && /^[\w-]{8,100}$/.test(value) ? value : null;
+};
 
 const tableForToken = async (token: string) => {
   const table = await prisma.restaurantTable.findFirst({
@@ -213,8 +218,19 @@ publicRouter.get(
     const table = await tableForToken(
       stringValue(request.params.tableToken, "tableToken")!,
     );
+    // History is private to the device that placed the orders, and ends once the table bill is closed.
+    const sessionId = sessionIdFrom(request);
+    if (!sessionId) {
+      response.json({ data: [] });
+      return;
+    }
     const orders = await prisma.order.findMany({
-      where: { restaurantId: table.restaurantId, tableId: table.id },
+      where: {
+        restaurantId: table.restaurantId,
+        tableId: table.id,
+        customerSessionId: sessionId,
+        billedAt: null,
+      },
       orderBy: { createdAt: "desc" },
       take: 20,
       include: {
@@ -480,6 +496,7 @@ publicRouter.post(
           totalMinor: subtotalMinor,
           customerNote: stringValue(body.customerNote, "customerNote", false),
           idempotencyKey,
+          customerSessionId: sessionIdFrom(request),
           items: {
             create: lines.map((line) => ({
               menuItemId: line.menuItemId,

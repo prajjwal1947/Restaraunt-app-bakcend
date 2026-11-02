@@ -1,7 +1,7 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 
-const configuredConnectionString = process.env.DATABASE_URL;
+const configuredConnectionString = process.env.MONGO_URI;
 if (!configuredConnectionString) {
 	throw new Error("DATABASE_URL is required. Create a private .env file before starting the API.");
 }

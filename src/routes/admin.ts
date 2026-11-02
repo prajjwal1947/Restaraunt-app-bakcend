@@ -2,7 +2,7 @@ import { Router, type Request } from "express";
 import multer from "multer";
 import QRCode from "qrcode";
 import crypto from "node:crypto";
-import { OrderStatus, UserRole } from "@prisma/client";
+import { OrderStatus, Prisma, UserRole } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import {
   asyncRoute,
@@ -39,9 +39,23 @@ const itemView = (item: any) => ({
 });
 const orderView = (order: any) => ({
   ...order,
+  customerSessionId: undefined,
   tableNumber: order.table?.number,
   items: order.items?.map((item: any) => ({ ...item, addOns: item.addOns })),
 });
+// A table stays occupied until every order on it has been billed or cancelled.
+const syncTableStatus = async (
+  transaction: Prisma.TransactionClient,
+  tableId: string,
+) => {
+  const open = await transaction.order.count({
+    where: { tableId, billedAt: null, status: { not: "CANCELLED" } },
+  });
+  await transaction.restaurantTable.update({
+    where: { id: tableId },
+    data: { status: open > 0 ? "OCCUPIED" : "AVAILABLE" },
+  });
+};
 
 adminRouter.get(
   "/restaurant",
@@ -883,6 +897,41 @@ adminRouter.patch(
     response.status(204).end();
   }),
 );
+adminRouter.post(
+  "/tables/:tableId/bill/close",
+  requireRole("OWNER", "MANAGER", "STAFF"),
+  asyncRoute(async (request, response) => {
+    const tableId = id(request, "tableId");
+    const table = await prisma.restaurantTable.findFirst({
+      where: { id: tableId, restaurantId: tenant(request) },
+    });
+    if (!table) throw new HttpError(404, "NOT_FOUND", "Table not found.");
+    const unfinished = await prisma.order.count({
+      where: { tableId, billedAt: null, status: { notIn: ["SERVED", "CANCELLED"] } },
+    });
+    if (unfinished > 0)
+      throw new HttpError(
+        409,
+        "ORDERS_IN_PROGRESS",
+        "Serve or cancel every order on this table before closing the bill.",
+      );
+    const now = new Date();
+    const closedOrders = await prisma.$transaction(async (transaction) => {
+      // Orders placed after the check above stay open for the next bill.
+      const result = await transaction.order.updateMany({
+        where: { tableId, billedAt: null, status: { in: ["SERVED", "CANCELLED"] } },
+        data: { billedAt: now },
+      });
+      await transaction.serviceRequest.updateMany({
+        where: { tableId, resolvedAt: null },
+        data: { resolvedAt: now, resolvedById: request.auth!.userId },
+      });
+      await syncTableStatus(transaction, tableId);
+      return result.count;
+    });
+    response.json({ data: { closedOrders, billedAt: now } });
+  }),
+);
 adminRouter.get(
   "/orders/:orderId",
   asyncRoute(async (request, response) => {
@@ -934,16 +983,7 @@ adminRouter.patch(
           next,
         },
       });
-      if (next === "SERVED" || next === "CANCELLED")
-        await transaction.restaurantTable.update({
-          where: { id: order.tableId },
-          data: { status: "AVAILABLE" },
-        });
-      else
-        await transaction.restaurantTable.update({
-          where: { id: order.tableId },
-          data: { status: "OCCUPIED" },
-        });
+      await syncTableStatus(transaction, order.tableId);
       return saved;
     });
     response.json({ data: orderView(updated) });
@@ -978,10 +1018,7 @@ adminRouter.post(
           next: "CANCELLED",
         },
       });
-      await transaction.restaurantTable.update({
-        where: { id: order.tableId },
-        data: { status: "AVAILABLE" },
-      });
+      await syncTableStatus(transaction, order.tableId);
       return saved;
     });
     response.json({ data: orderView(updated) });
