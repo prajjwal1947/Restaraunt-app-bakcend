@@ -218,17 +218,12 @@ publicRouter.get(
     const table = await tableForToken(
       stringValue(request.params.tableToken, "tableToken")!,
     );
-    // History is private to the device that placed the orders, and ends once the table bill is closed.
-    const sessionId = sessionIdFrom(request);
-    if (!sessionId) {
-      response.json({ data: [] });
-      return;
-    }
+    // Show all orders for this table (not filtered by session/device)
+    // Ends once the table bill is closed.
     const orders = await prisma.order.findMany({
       where: {
         restaurantId: table.restaurantId,
         tableId: table.id,
-        customerSessionId: sessionId,
         billedAt: null,
       },
       orderBy: { createdAt: "desc" },
