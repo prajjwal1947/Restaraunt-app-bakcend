@@ -1,0 +1,54 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                    🍽️  DEMO ADMIN LOGIN CREDENTIALS                      ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+📧 EMAIL:        admin@demo.example
+🔑 PASSWORD:     Demo@123456
+
+🏪 RESTAURANT:   Olive & Thyme Demo
+👤 ROLE:         OWNER
+
+═══════════════════════════════════════════════════════════════════════════
+
+🚀 GETTING STARTED:
+
+1. Start Backend:
+   $ npm run dev
+
+2. Start Frontend (separate terminal):
+   $ cd ../restaurant-app-frontend && npm run dev
+
+3. Open Admin App:
+   → http://localhost:5173
+
+4. Login with credentials above
+
+═══════════════════════════════════════════════════════════════════════════
+
+🔧 API ENDPOINTS:
+
+   Backend:       http://localhost:4000
+   Admin App:     http://localhost:5173
+   Customer App:  http://localhost:5174
+
+═══════════════════════════════════════════════════════════════════════════
+
+⚙️  USEFUL COMMANDS:
+
+   npm run dev              - Start backend server
+   npm run create:admin     - Create/reset demo admin
+   npm run prisma:studio    - View database
+   npm run prisma:migrate   - Run migrations
+   docker-compose up -d     - Start PostgreSQL
+
+═══════════════════════════════════════════════════════════════════════════
+
+🔐 SECURITY NOTES:
+
+   ⚠️  For development only - change password after login
+   ⚠️  Never use in production
+   ⚠️  Never commit to version control
+
+═══════════════════════════════════════════════════════════════════════════
+
+📚 More Info: See DEMO_CREDENTIALS.md and ADMIN_SETUP_COMPLETE.md

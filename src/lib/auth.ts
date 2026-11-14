@@ -33,11 +33,30 @@ export const revokeRefreshToken = async (token: string) => {
 };
 
 export const rotateRefreshToken = async (token: string) => {
-  const saved = await prisma.refreshToken.findFirst({ where: { tokenHash: hashRefreshToken(token), revokedAt: null, expiresAt: { gt: new Date() } } });
-  if (!saved) throw new HttpError(401, "INVALID_REFRESH_TOKEN", "Refresh token is invalid or expired.");
+  const tokenHash = hashRefreshToken(token);
+  const saved = await prisma.refreshToken.findFirst({ 
+    where: { 
+      tokenHash, 
+      revokedAt: null, 
+      expiresAt: { gt: new Date() } 
+    } 
+  });
+  
+  if (!saved) {
+    // Check if token was already used (revoked)
+    const revoked = await prisma.refreshToken.findFirst({ 
+      where: { tokenHash, revokedAt: { not: null } } 
+    });
+    if (revoked) {
+      throw new HttpError(401, "INVALID_REFRESH_TOKEN", "Refresh token has already been used. Please login again.");
+    }
+    throw new HttpError(401, "INVALID_REFRESH_TOKEN", "Refresh token is invalid or expired.");
+  }
+  
   await prisma.refreshToken.update({ where: { id: saved.id }, data: { revokedAt: new Date() } });
   const user = await prisma.user.findUnique({ where: { id: saved.userId } });
   if (!user || !user.isActive) throw new HttpError(401, "INVALID_REFRESH_TOKEN", "Refresh token is invalid or expired.");
+  
   return { user, refreshToken: await issueRefreshToken(user), accessToken: issueAccessToken(user) };
 };
 

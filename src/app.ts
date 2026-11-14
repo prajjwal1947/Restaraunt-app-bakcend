@@ -9,6 +9,9 @@ import { authRouter } from "./routes/auth";
 import { analyticsAssistantRouter } from "./routes/analyticsAssistant";
 import { adminRouter } from "./routes/admin";
 import { publicRouter } from "./routes/public";
+import { staffOtpRouter } from "./routes/staff-otp";
+import { adminOtpSettingsRouter } from "./routes/admin-otp-settings";
+import { urbanPiperAdminRouter, urbanPiperWebhookRouter } from "./routes/urbanPiper";
 import { prisma } from "./lib/prisma";
 
 const allowedOrigins = [
@@ -68,8 +71,12 @@ app.get("/health/db", async (_request, response) => {
 });
 
 app.use("/api/v1/public", publicRouter);
+app.use("/api/v1/webhooks/urbanpiper", urbanPiperWebhookRouter);
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/dashboard/insights", analyticsAssistantRouter);
+app.use("/api/v1", staffOtpRouter);
+app.use("/api/v1", adminOtpSettingsRouter);
+app.use("/api/v1", urbanPiperAdminRouter);
 app.use("/api/v1", adminRouter);
 app.use("/api/v1", notFound);
 app.use(errorHandler);

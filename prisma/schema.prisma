@@ -55,11 +55,15 @@ model Restaurant {
   addOns       AddOn[]
   tables       RestaurantTable[]
   orders       Order[]
+  urbanPiperOrders UrbanPiperOrder[]
   serviceRequests ServiceRequest[]
   refreshTokens RefreshToken[]
   analyticsChatMessages AnalyticsChatMessage[]
   localActivities LocalActivity[]
   contextCaches RestaurantContextCache[]
+  otpSettings  RestaurantOTPSettings?
+  whatsappConnection RestaurantWhatsAppConnection?
+  staffOTPs    StaffOTP[]
 }
 
 model RestaurantBranding {
@@ -257,6 +261,25 @@ model OrderItem {
   addOns         OrderItemAddOn[]
 }
 
+model UrbanPiperOrder {
+  id              String     @id @default(uuid()) @db.Uuid
+  restaurantId    String     @db.Uuid
+  businessId      String
+  storeId         String
+  externalOrderId String
+  channel         String
+  status          String
+  statusUpdatedAt DateTime?
+  payload         Json
+  statusPayload   Json?
+  cancellationPayload Json?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  restaurant      Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  @@unique([businessId, externalOrderId])
+  @@index([restaurantId, createdAt])
+}
+
 model OrderItemAddOn {
   id             String    @id @default(uuid()) @db.Uuid
   orderItemId    String    @db.Uuid
@@ -322,4 +345,38 @@ model RestaurantContextCache {
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
   @@id([restaurantId, provider])
+}
+
+model RestaurantOTPSettings {
+  restaurantId String     @id @db.Uuid
+  isEnabled    Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+}
+
+model RestaurantWhatsAppConnection {
+  restaurantId         String     @id @db.Uuid
+  phoneNumberId        String
+  displayPhoneNumber   String?
+  accessTokenEncrypted String
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+  restaurant           Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+}
+
+model StaffOTP {
+  id           String     @id @default(uuid()) @db.Uuid
+  restaurantId String     @db.Uuid
+  phone        String
+  otp          String     @db.VarChar(6)
+  attempts     Int        @default(0)
+  maxAttempts  Int        @default(3)
+  expiresAt    DateTime
+  verifiedAt   DateTime?
+  createdAt    DateTime   @default(now())
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, phone])
+  @@index([expiresAt])
 }
