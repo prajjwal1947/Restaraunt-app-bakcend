@@ -1,5 +1,7 @@
 # Olive & Thyme Backend Specification
 
+For UrbanPiper, Swiggy and Zomato order integration setup and current limitations, see [docs/URBANPIPER.md](docs/URBANPIPER.md).
+
 This document is the backend handoff for the restaurant admin dashboard and customer ordering app in this repository.
 
 The frontend currently uses local fixture data and component state. The backend should provide the persistent, authenticated API described below. The API should be tenant-aware because one backend may serve multiple restaurants.
@@ -49,9 +51,12 @@ CLIENT_ADMIN_URL=http://localhost:5173
 CLIENT_CUSTOMER_URL=http://localhost:5174
 UPLOAD_PROVIDER=local
 UPLOAD_BASE_URL=http://localhost:4000/uploads
+WHATSAPP_CREDENTIALS_ENCRYPTION_KEY=replace-with-at-least-32-random-characters
+META_GRAPH_API_VERSION=v22.0
 ```
 
 Never return password hashes, refresh token values, or private account fields in API responses.
+Generate the WhatsApp encryption key with `openssl rand -base64 32`, keep it server-side, and use the same value across backend instances. Changing it makes existing restaurant connections unreadable. Each restaurant connects its own Meta WhatsApp Cloud API phone number from admin OTP settings using a system-user token with WhatsApp Business messaging and management permissions. The phone number's WhatsApp account must have an approved `otp_login` template in `en_US`.
 
 ## Authentication and Authorization
 

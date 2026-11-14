@@ -54,14 +54,18 @@ authRouter.post("/login", loginLimit, asyncRoute(async (request, response) => {
   if (!user || !(await comparePassword(password, user.passwordHash))) {
     throw new HttpError(401, "INVALID_CREDENTIALS", "Invalid email or password.");
   }
-  response.json({ data: { accessToken: issueAccessToken(user), refreshToken: await issueRefreshToken(user), user: publicUser(user) } });
+  const accessTokenTtl = process.env.ACCESS_TOKEN_TTL ?? "15m";
+  const expiresIn = accessTokenTtl === "15m" ? 15 * 60 : accessTokenTtl === "1h" ? 60 * 60 : 15 * 60;
+  response.json({ data: { accessToken: issueAccessToken(user), refreshToken: await issueRefreshToken(user), user: publicUser(user), expiresIn } });
 }));
 
 authRouter.post("/refresh", asyncRoute(async (request, response) => {
   const body = requireBody(request.body);
   const token = stringValue(body.refreshToken, "refreshToken")!;
   const result = await rotateRefreshToken(token);
-  response.json({ data: { accessToken: result.accessToken, refreshToken: result.refreshToken, user: publicUser(result.user) } });
+  const accessTokenTtl = process.env.ACCESS_TOKEN_TTL ?? "15m";
+  const expiresIn = accessTokenTtl === "15m" ? 15 * 60 : accessTokenTtl === "1h" ? 60 * 60 : 15 * 60;
+  response.json({ data: { accessToken: result.accessToken, refreshToken: result.refreshToken, user: publicUser(result.user), expiresIn } });
 }));
 
 authRouter.post("/logout", asyncRoute(async (request, response) => {
